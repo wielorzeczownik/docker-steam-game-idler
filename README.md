@@ -51,15 +51,15 @@ Everything the app saves (the Steam session, settings, logs) lives in `/config`.
 
 The web viewer comes from the base image, so all of its [environment variables](https://github.com/jlesage/docker-baseimage-gui#environment-variables) work. The ones you're most likely to want:
 
-| Variable                      | Default   | Meaning                                              |
-| ----------------------------- | --------- | ---------------------------------------------------- |
-| `TZ`                          | `Etc/UTC` | time zone, see the [list][tz]                        |
-| `USER_ID` / `GROUP_ID`        | `1000`    | owner of the files in `/config`                      |
-| `WEB_AUTHENTICATION`          | `0`       | `1` asks for a login before showing the app          |
-| `WEB_AUTHENTICATION_USERNAME` | -         | login for the web viewer                             |
-| `WEB_AUTHENTICATION_PASSWORD` | -         | password for the web viewer                          |
-| `DARK_MODE`                   | `0`       | `1` gives the window frame a dark theme              |
-| `DISPLAY_WIDTH` / `_HEIGHT`   | `1920`    | size of the virtual screen (height defaults to 1080) |
+| Variable                      | Required                    | Default   | Meaning                                              |
+| ----------------------------- | --------------------------- | --------- | ---------------------------------------------------- |
+| `TZ`                          | no                          | `Etc/UTC` | time zone, see the [list][tz]                        |
+| `USER_ID` / `GROUP_ID`        | no                          | `1000`    | owner of the files in `/config`                      |
+| `WEB_AUTHENTICATION`          | no                          | `0`       | `1` asks for a login before showing the app          |
+| `WEB_AUTHENTICATION_USERNAME` | with `WEB_AUTHENTICATION=1` | -         | login for the web viewer                             |
+| `WEB_AUTHENTICATION_PASSWORD` | with `WEB_AUTHENTICATION=1` | -         | password for the web viewer                          |
+| `DARK_MODE`                   | no                          | `0`       | `1` gives the window frame a dark theme              |
+| `DISPLAY_WIDTH` / `_HEIGHT`   | no                          | `1920`    | size of the virtual screen (height defaults to 1080) |
 
 [tz]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
