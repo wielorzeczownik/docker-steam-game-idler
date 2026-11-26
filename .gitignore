@@ -1,0 +1,20 @@
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Runtime data from docker-compose.example.yml
+config/
+docker-compose.yml
+
+# Environment / tooling
+.env
+.env.*
+*.log
+
+# Build / temp
+*.tmp
+release_notes.md
+
+# Claude Code
+.claude/

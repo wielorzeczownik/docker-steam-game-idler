@@ -1,0 +1,176 @@
+name: Validate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # renovate: datasource=github-releases depName=rhysd/actionlint extractVersion=^v(?<version>.+)$
+  ACTIONLINT_VERSION: 1.7.12
+  # renovate: datasource=npm depName=prettier
+  PRETTIER_VERSION: 3.10.1
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      image: ${{ steps.filter.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            dockerfile: &dockerfile
+              - '.github/workflows/validate.yml'
+              - 'Dockerfile'
+            shell: &shell
+              - '.github/workflows/validate.yml'
+              - 'rootfs/**'
+              - 'scripts/**/*.sh'
+            image:
+              - *dockerfile
+              - *shell
+              - '.dockerignore'
+            markdown:
+              - '.github/workflows/validate.yml'
+              - '**/*.md'
+            workflows:
+              - '.github/workflows/**'
+            format:
+              - '.github/workflows/validate.yml'
+              - '.prettierrc'
+              - '.prettierignore'
+              - '**/*.json'
+              - '**/*.md'
+              - '**/*.yml'
+              - '**/*.yaml'
+
+      - name: Lint Dockerfile
+        if: ${{ !cancelled() && steps.filter.outputs.dockerfile == 'true' }}
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Install shfmt and shellcheck
+        if: ${{ !cancelled() && steps.filter.outputs.shell == 'true' }}
+        uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+        with:
+          tool: shfmt,shellcheck
+
+      - name: Format check shell scripts
+        if: ${{ !cancelled() && steps.filter.outputs.shell == 'true' }}
+        run: shfmt --diff rootfs/ scripts/
+
+      - name: Lint shell scripts
+        if: ${{ !cancelled() && steps.filter.outputs.shell == 'true' }}
+        run: shellcheck rootfs/startapp.sh rootfs/etc/cont-init.d/*.sh scripts/*.sh
+
+      - name: Lint workflows
+        if: ${{ !cancelled() && steps.filter.outputs.workflows == 'true' }}
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+        with:
+          version: ${{ env.ACTIONLINT_VERSION }}
+          shellcheck: true
+
+      - name: Format check
+        if: ${{ !cancelled() && steps.filter.outputs.format == 'true' }}
+        run: npx --yes "prettier@${PRETTIER_VERSION}" --check .
+
+      - name: Lint Markdown
+        if: ${{ !cancelled() && steps.filter.outputs.markdown == 'true' }}
+        uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
+        with:
+          globs: |
+            **/*.md
+            !CHANGELOG.md
+
+  image:
+    name: Image
+    needs: checks
+    if: ${{ !cancelled() && needs.checks.outputs.image == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build Docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: false
+          load: true
+          tags: steam-game-idler:test
+          cache-from: type=gha,scope=validate
+          cache-to: type=gha,mode=max,scope=validate
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name sgi -p 5800:5800 steam-game-idler:test
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:5800 && docker exec sgi pgrep -x 'Steam Game Idle' >/dev/null; then
+              echo "Web UI is up and the app is running."
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs sgi
+          echo "::error::The web UI or the app did not come up within 60 seconds."
+          exit 1
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: steam-game-idler:test
+          format: json
+          output: trivy.json
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Report vulnerabilities
+        shell: bash
+        run: |
+          set -uo pipefail
+          count=$(jq '[.Results[]?.Vulnerabilities[]?] | length' trivy.json)
+          if [[ "$count" -eq 0 ]]; then
+            echo "No fixable CRITICAL or HIGH vulnerabilities."
+            exit 0
+          fi
+          echo "::warning title=trivy::$count fixable CRITICAL/HIGH vulnerabilities, see the job summary. Not blocking this pull request."
+          {
+            echo "### Trivy findings"
+            echo
+            echo "Remediation is a base image digest bump, which Renovate raises separately."
+            echo
+            echo '```text'
+            jq -r '
+              .Results[]?.Vulnerabilities[]?
+              | "\(.Severity) \(.VulnerabilityID) \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion // "no fix")"
+            ' trivy.json | sort -u
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"

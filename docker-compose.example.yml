@@ -1,0 +1,17 @@
+services:
+  steam-game-idler:
+    image: wielorzeczownik/steam-game-idler:latest
+    container_name: steam-game-idler
+    # the app ships for x86_64 only, ARM hosts run it through emulation
+    platform: linux/amd64
+    environment:
+      - TZ=Etc/UTC
+      # uncomment to require a login on the web UI
+      # - WEB_AUTHENTICATION=1
+      # - WEB_AUTHENTICATION_USERNAME=admin
+      # - WEB_AUTHENTICATION_PASSWORD=change-me
+    ports:
+      - 5800:5800
+    volumes:
+      - ./config:/config
+    restart: unless-stopped
