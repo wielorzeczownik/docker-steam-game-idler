@@ -80,7 +80,7 @@ jobs:
 
       - name: Lint shell scripts
         if: ${{ !cancelled() && steps.filter.outputs.shell == 'true' }}
-        run: shellcheck rootfs/startapp.sh rootfs/etc/cont-init.d/*.sh scripts/*.sh
+        run: shellcheck rootfs/startapp.sh rootfs/etc/cont-init.d/*.sh rootfs/usr/local/bin/xdg-open scripts/*.sh
 
       - name: Lint workflows
         if: ${{ !cancelled() && steps.filter.outputs.workflows == 'true' }}

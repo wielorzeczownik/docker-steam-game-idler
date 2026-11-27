@@ -26,7 +26,7 @@ LABEL org.opencontainers.image.source="https://github.com/wielorzeczownik/docker
 # Runtime libraries of the Tauri app, plus a session bus and keyring for its stored credentials.
 # The .deb is only unpacked, since its dependency names don't all match Ubuntu's.
 RUN --mount=type=bind,from=sgi,source=/sgi.deb,target=/tmp/sgi.deb \
-  add-pkg libsecret-1-0 libayatana-appindicator3-1 libwebkit2gtk-4.1-0 libgtk-3-0 dbus-x11 gnome-keyring ca-certificates \
+  add-pkg libsecret-1-0 libayatana-appindicator3-1 libwebkit2gtk-4.1-0 libgtk-3-0 dbus-x11 gnome-keyring ca-certificates zenity xclip \
   && dpkg -x /tmp/sgi.deb / \
   && mkdir -p /etc/gtk-3.0 \
   && printf '[Settings]\ngtk-enable-animations=0\n' >/etc/gtk-3.0/settings.ini \

@@ -1,0 +1,8 @@
+#!/bin/sh
+# The container has no browser, so put the link in the clipboard and show it in a window,
+# for the user to open in their own browser
+url="$1"
+printf '%s' "$url" | xclip -selection clipboard 2>/dev/null || true
+zenity --entry --title="Open in your browser" --width=600 \
+  --text="Copy this link and open it in your own browser (it is already in the clipboard panel):" \
+  --entry-text="$url" >/dev/null 2>&1 &
